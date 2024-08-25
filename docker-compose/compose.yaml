@@ -6,7 +6,7 @@
 version: '3.7'
 services:
   grafana:
-    image: grafana/grafana:10.0.3
+    image: grafana/grafana:10.0.3@sha256:423040d62678074111e4e72d7dcef23480a94eb4f21b9173204d1a5ee972ec59
     entrypoint:
       - /usr/share/grafana/bin/grafana-server
       - --homepath=/usr/share/grafana
@@ -20,13 +20,13 @@ services:
       - "3000:3000"
 
   loki:
-    image: grafana/loki:2.8.3
+    image: grafana/loki:2.8.3@sha256:7d44535954d6099f032c477e1baafdc4be5e3d4ee5cd584117963d364fd74ded
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"
 
   mimir:
-    image: grafana/mimir:2.9.0
+    image: grafana/mimir:2.9.0@sha256:dba11782c968d585558793598e5000480c0c3d0c611fee21dc5d59fd9fb837ad
     volumes:
       - ./mimir/config:/etc/mimir-config
     entrypoint:
@@ -36,7 +36,7 @@ services:
       - "9009:9009"
 
   tempo:
-    image: grafana/tempo:2.1.0
+    image: grafana/tempo:2.1.0@sha256:db8a80ce69515e100f6dd1777651dae4e74f18b9d711c4ba0f41c4f610dc443b
     command:
       - "-storage.trace.backend=local"                  # tell tempo where to permanently put traces
       - "-storage.trace.local.path=/tmp/tempo/traces"

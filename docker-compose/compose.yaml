@@ -1,0 +1,52 @@
+#
+# The original version of this file is taken from the example directory in the grafana agent repository
+# You can find that here: https://github.com/grafana/agent/blob/main/example/docker-compose/docker-compose.yaml.
+# The copy was taken at commit b9c3594b84e7be24fa936548782130e39636eb38
+#
+version: '3.7'
+services:
+  grafana:
+    image: grafana/grafana:10.0.3
+    entrypoint:
+      - /usr/share/grafana/bin/grafana-server
+      - --homepath=/usr/share/grafana
+      - --config=/etc/grafana-config/grafana.ini
+    volumes:
+      - ./grafana/config:/etc/grafana-config
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/dashboards-provisioning:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    ports:
+      - "3000:3000"
+
+  loki:
+    image: grafana/loki:2.8.3
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "3100:3100"
+
+  mimir:
+    image: grafana/mimir:2.9.0
+    volumes:
+      - ./mimir/config:/etc/mimir-config
+    entrypoint:
+      - /bin/mimir
+      - -config.file=/etc/mimir-config/mimir.yaml
+    ports:
+      - "9009:9009"
+
+  tempo:
+    image: grafana/tempo:2.1.0
+    command:
+      - "-storage.trace.backend=local"                  # tell tempo where to permanently put traces
+      - "-storage.trace.local.path=/tmp/tempo/traces"
+      - "-storage.trace.wal.path=/tmp/tempo/wal"        # tell tempo where to store the wal
+      - "-auth.enabled=false"                           # disables the requirement for the X-Scope-OrgID header
+      - "-server.http-listen-port=3200"
+    ports:
+      - "3200:3200"
+      - "4317:4317"
+
+volumes:
+  elasticsearch_data:
+    driver: local

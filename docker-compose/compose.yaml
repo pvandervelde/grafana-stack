@@ -36,7 +36,7 @@ services:
       - "9009:9009"
 
   tempo:
-    image: grafana/tempo:2.5.0@sha256:f0200a9bff6d14eb3a4332194f7b77c37ee1a3535e7e41db024d95aab6f1b4e8
+    image: grafana/tempo:2.6.1@sha256:ef4384fce6e8ad22b95b243d8fc165628cda655376fd50e7850536ad89d71d50
     command:
       - "-storage.trace.backend=local"                  # tell tempo where to permanently put traces
       - "-storage.trace.local.path=/tmp/tempo/traces"

@@ -20,7 +20,7 @@ services:
       - "3000:3000"
 
   loki:
-    image: grafana/loki:3.1.1@sha256:e689cc634841c937de4d7ea6157f17e29cf257d6a320f1c293ab18d46cfea986
+    image: grafana/loki:3.2.1@sha256:09a53b4a4ff81ffcd8f13886df19d33fac7a8d3aaf952e3c7e66cbade5b2fc31
     command: -config.file=/etc/loki/local-config.yaml
     ports:
       - "3100:3100"

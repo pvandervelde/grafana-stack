@@ -1,0 +1,61 @@
+# Settings and configurations that are common for all containers
+x-loki-common: &loki-common
+  expose:
+    - 3100
+  restart: unless-stopped
+  image: grafana/loki:latest
+  networks:
+      #- loki-bridge
+      - internal
+  volumes:
+    - ./config/loki/config.yaml:/etc/loki/config.yaml
+
+services:
+  loki-read:
+    <<: *loki-common
+    command: "-config.file=/etc/loki/config.yaml -target=read"
+    depends_on:
+      - minio-proxy
+      - minio-initialize
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://loki-read:3100/ready || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  loki-write:
+    <<: *loki-common
+    command: "-config.file=/etc/loki/config.yaml -target=write"
+    depends_on:
+      - minio-proxy
+      - minio-initialize
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://loki-write:3100/ready || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  loki-backend:
+    <<: *loki-common
+    command: "-config.file=/etc/loki/config.yaml -target=backend -legacy-read-mode=false"
+
+  loki-proxy:
+    depends_on:
+      - loki-read
+      - loki-write
+    expose:
+      - "3100"
+    image: nginx:latest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.loki.entrypoints=https
+      - traefik.http.routers.loki.service=loki
+      - traefik.http.routers.loki.rule=Host(`logs.${INGRESS_DOMAIN:?error}`)
+      - traefik.http.services.loki.loadbalancer.server.port=3100
+      - traefik.docker.network=internal
+    networks:
+      #- loki-bridge
+      - internal
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx/loki.conf:/etc/nginx/nginx.conf:ro

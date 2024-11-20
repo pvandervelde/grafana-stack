@@ -1,0 +1,34 @@
+services:
+  grafana:
+    command:
+      - --config=/etc/grafana-config/grafana.ini
+    dns:
+      - "${LOCAL_NETWORK_DNS_IP:?error}"
+      - "${ROUTER_IP:?error}"
+    dns_opt:
+      - "ndots:1"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/healthz"]
+      interval: 1s
+      start_interval: 0s
+      timeout: 10s
+      retries: 5
+    image: grafana/grafana:latest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.grafana.entrypoints=https
+      - traefik.http.routers.grafana.service=grafana
+      - traefik.http.routers.grafana.rule=Host(`grafana.${INGRESS_DOMAIN:?error}`)
+      - traefik.http.services.grafana.loadbalancer.server.port=3000
+      - traefik.docker.network=internal
+    networks:
+      - internal
+    restart: unless-stopped
+    volumes:
+      - ./config/grafana/config:/etc/grafana-config
+      - ./config/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ./config/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
+

@@ -1,0 +1,6 @@
+config/traefik/ingress/certs/*.crt
+config/traefik/ingress/certs/*.key
+
+config/traefik/ingress/logs/
+config/traefik/ingress/configs/tls.yml
+.env

@@ -1,0 +1,67 @@
+# Settings and configurations that are common for all containers
+x-tempo-common: &tempo-common
+  command: "-target=scalable-single-binary -config.file=/etc/tempo.yaml"
+  depends_on:
+      - minio-proxy
+      - minio-initialize
+  expose:
+    - 3200 # Tempo HTTP
+    - 4317 # OTLP gRPC
+    - 4318 # OTLP HTTP
+  image: grafana/tempo:latest
+  networks:
+      internal:
+        aliases:
+          - tempo
+  restart: unless-stopped
+  volumes:
+    - ./config/tempo/config.yaml:/etc/tempo.yaml
+
+services:
+  tempo1:
+    <<: *tempo-common
+
+  tempo2:
+    <<: *tempo-common
+
+  tempo3:
+    <<: *tempo-common
+
+  vulture:
+    image: grafana/tempo-vulture:latest
+    command:
+      - "-prometheus-listen-address=:3201"
+      - "-tempo-push-url=http://tempo1"
+      - "-tempo-query-url=http://tempo1:3200"
+      - "-tempo-retention-duration=1h"
+    networks:
+      - internal
+
+  tempo-proxy:
+    depends_on:
+      - tempo1
+      - tempo2
+      - tempo3
+    expose:
+      - 3200 # Tempo HTTP
+      - 4317 # OTLP gRPC
+      - 4318 # OTLP HTTP
+    image: nginx:latest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.tempo.entrypoints=https
+      - traefik.http.routers.tempo.service=tempo
+      - traefik.http.routers.tempo.rule=Host(`traces.${INGRESS_DOMAIN:?error}`)
+      - traefik.http.services.tempo.loadbalancer.server.port=3200
+
+      - traefik.http.routers.otlp.entrypoints=https
+      - traefik.http.routers.otlp.service=otlp
+      #- traefik.http.routers.otlp.rule=Host(`otlp.${INGRESS_DOMAIN:?error}`)
+      - traefik.http.services.otlp.loadbalancer.server.port=4318
+
+      - traefik.docker.network=internal
+    networks:
+      - internal
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx/tempo.conf:/etc/nginx/nginx.conf:ro

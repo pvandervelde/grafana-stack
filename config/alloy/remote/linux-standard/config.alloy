@@ -1,0 +1,166 @@
+
+
+// Host metrics
+
+prometheus.exporter.unix "host" { }
+
+prometheus.scrape "host" {
+  targets    = prometheus.exporter.unix.host.targets
+  forward_to = [prometheus.relabel.hostname.receiver,]
+}
+
+
+// SystemD logs
+
+// System log collection
+loki.source.file "system_logs" {
+  targets = [
+    {
+      // System logs
+      __path__ = "/var/log/syslog",
+      app      = "syslog"
+    },
+    {
+      __path__ = "/var/log/auth.log",
+      app      = "auth"
+    },
+    {
+      __path__ = "/var/log/kern.log",
+      app      = "kernel"
+    },
+    {
+      __path__ = "/var/log/dpkg.log",
+      app      = "dpkg"
+    },
+    {
+      __path__ = "/var/log/apt/history.log",
+      app      = "apt-history"
+    },
+    {
+      __path__ = "/var/log/fail2ban.log",
+      app      = "fail2ban"
+    }
+  ]
+
+  forward_to = [loki.process.system_logs.receiver]
+}
+
+// Process system logs to add labels and filters
+loki.process "system_logs" {
+  forward_to = [loki.relabel.hostname.receiver]
+
+  stage.json {
+    expressions = {
+      timestamp = "timestamp"
+      level     = "level"
+      message   = "message"
+    }
+  }
+}
+
+// Systemd journal logs
+loki.source.journal "systemd" {
+  forward_to = [loki.relabel.hostname.receiver]
+
+  // Include relevant systemd units
+  units = [
+    "ssh.service",
+    "networking.service",
+    "systemd-networkd.service",
+    "systemd-resolved.service",
+    "cron.service"
+  ]
+}
+
+//
+// SELF MONITORING
+//
+
+// Metrics
+
+prometheus.exporter.self "alloy_local" {
+}
+
+prometheus.scrape "alloy_local" {
+  targets    = prometheus.exporter.self.alloy_local.targets
+  forward_to = [prometheus.relabel.hostname.receiver,]
+}
+
+// Logs
+
+logging {
+  level    = "info"
+  format   = "json"
+  write_to = [loki.relabel.hostname.receiver,]
+}
+
+// Traces
+
+tracing {
+  sampling_fraction = 0.1
+  write_to          = [otelcol.exporter.otlp.local.input]
+}
+
+//
+// SHARED
+//
+
+loki.relabel "hostname"{
+	rule {
+		target_label = "instance"
+		replacement = constants.hostname
+	}
+
+  rule {
+		target_label = "os"
+		replacement = constants.os
+	}
+
+	forward_to = [loki.write.local.receiver]
+}
+
+prometheus.relabel "hostname" {
+	rule {
+		target_label = "instance"
+		replacement  = constants.hostname
+	}
+
+  rule {
+		target_label = "os"
+		replacement  = constants.os
+	}
+
+	forward_to   = [prometheus.remote_write.local.receiver]
+}
+
+//
+// ENDPOINTS
+//
+
+prometheus.remote_write "local" {
+	endpoint {
+		url = format(
+			"http://%s/api/v1/push",
+			coalesce(env("MIMIR_HOST"), "localhost:9009"),
+		)
+	}
+}
+
+loki.write "local" {
+	endpoint {
+		url = format(
+			"http://%s/loki/api/v1/push",
+			coalesce(env("LOKI_HOST"), "localhost:3100"),
+		)
+	}
+}
+
+otelcol.exporter.otlp "local" {
+	client {
+		endpoint = coalesce(env("TEMPO_HOST"), "localhost:4317")
+
+		tls {
+			insecure = true
+		}
+	}
+}

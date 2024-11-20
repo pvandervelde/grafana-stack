@@ -1,0 +1,29 @@
+include:
+  - ./networks.yaml
+  - ./minio.yaml
+  - ./grafana.yaml
+  - ./mimir.yaml
+  - ./loki.yaml
+  - ./tempo.yaml
+  - ./traefik.yaml
+
+services:
+  alloy:
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --stability.level=experimental # Enable all functionality
+    environment:
+      MIMIR_HOST: mimir-proxy:9009
+      LOKI_HOST: loki-proxy:3100
+      TEMPO_HOST: tempo-proxy:4318
+    expose:
+      - 12345
+    image: grafana/alloy:latest
+    networks:
+      - internal
+    restart: unless-stopped
+    volumes:
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy

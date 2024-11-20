@@ -1,0 +1,225 @@
+// This file serves as an example Alloy configuration to interact with the
+// Docker Compose environment.
+//
+// This configuration works whether you are running Alloy locally or within the
+// Docker Compose environment when the `alloy` profile is enabled.
+
+
+//
+// LOKI
+//
+
+prometheus.scrape "loki" {
+	targets = [{
+		__address__ = "loki-read:3100",
+		__address__ = "loki-write:3100",
+		__address__ = "loki-backend:3100",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "loki"
+	metrics_path = "/metrics"
+}
+
+// Loki logs
+
+// Loki traces
+
+
+//
+// MIMIR
+//
+
+prometheus.scrape "mimir" {
+	targets = [{
+		__address__ = "mimir1:9009",
+		__address__ = "mimir2:9009",
+		__address__ = "mimir3:9009",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "mimir"
+	metrics_path = "/metrics"
+}
+
+// Mimir logs
+
+// Mimir traces
+
+//
+// MINIO
+//
+
+prometheus.scrape "minio_cluster" {
+	targets = [
+		{"__address__" = "minio1:9000",},
+		{"__address__" = "minio2:9000",},
+		{"__address__" = "minio3:9000",},
+		{"__address__" = "minio4:9000",},
+	]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "minio"
+	metrics_path = "/minio/v2/metrics/cluster"
+}
+
+prometheus.scrape "minio_node" {
+	targets = [{
+		__address__ = "minio-proxy:9000",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "minio"
+	metrics_path = "/minio/v2/metrics/node"
+}
+
+prometheus.scrape "minio_bucket" {
+	targets = [{
+		__address__ = "minio-proxy:9000",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "minio"
+	metrics_path = "/minio/v2/metrics/bucket"
+}
+
+prometheus.scrape "minio_resource" {
+	targets = [{
+		__address__ = "minio-proxy:9000",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "minio"
+	metrics_path = "/minio/v2/metrics/resource"
+}
+
+// Minio logs
+
+// Minio traces
+
+//
+// TEMPO
+//
+
+prometheus.scrape "tempo" {
+	targets = [{
+		__address__ = "tempo1:3200",
+		__address__ = "tempo2:3200",
+		__address__ = "tempo3:3200",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "tempo"
+	metrics_path = "/metrics"
+}
+
+prometheus.scrape "tempo_vulture" {
+	targets = [{
+		__address__ = "vulture:3201",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "vulture"
+	metrics_path = "/metrics"
+}
+
+// tempo logs
+
+// tempo traces
+
+//
+// TRAEFIK
+//
+
+prometheus.scrape "traefik_ingress" {
+	targets = [{
+		__address__ = "ingress-proxy:8081",
+	}]
+	forward_to   = [prometheus.relabel.hostname.receiver]
+	job_name     = "traefik"
+	metrics_path = "/metrics"
+}
+
+
+//
+// SELF MONITORING
+//
+
+// Metrics
+
+prometheus.exporter.self "alloy_local" {
+}
+
+prometheus.scrape "alloy_local" {
+  targets    = prometheus.exporter.self.alloy_local.targets
+  forward_to = [prometheus.relabel.hostname.receiver,]
+  job_name   = "alloy"
+}
+
+// Logs
+
+logging {
+	level = "info"
+	format = "json"
+
+	// Forward internal logs to the local Loki instance.
+	write_to = [loki.relabel.hostname.receiver]
+}
+
+// Traces
+
+tracing {
+  sampling_fraction = 0.1
+  write_to          = [otelcol.exporter.otlphttp.local.input]
+}
+
+//
+// SHARED
+//
+
+loki.relabel "hostname"{
+	// rule {
+	// 	target_label = "instance"
+	// 	replacement = constants.hostname
+	// }
+
+	forward_to = [loki.write.local.receiver]
+}
+
+prometheus.relabel "hostname" {
+	// rule {
+	// 	target_label = "instance"
+	// 	replacement  = constants.hostname
+	// }
+
+	forward_to   = [prometheus.remote_write.local.receiver]
+}
+
+
+//
+// ENDPOINTS
+//
+
+prometheus.remote_write "local" {
+	endpoint {
+		url = format(
+			"http://%s/api/v1/push",
+			coalesce(env("MIMIR_HOST"), "localhost:9009"),
+		)
+	}
+}
+
+loki.write "local" {
+	endpoint {
+		url = format(
+			"http://%s/loki/api/v1/push",
+			coalesce(env("LOKI_HOST"), "localhost:3100"),
+		)
+	}
+}
+
+otelcol.exporter.otlphttp "local" {
+	client {
+		endpoint = format(
+			"http://%s",
+			coalesce(env("TEMPO_HOST"), "localhost:4318"),
+		)
+
+		tls {
+			insecure             = true
+			insecure_skip_verify = true
+		}
+	}
+}

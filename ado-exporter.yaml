@@ -1,0 +1,26 @@
+services:
+  ado-exporter:
+    command:
+      - --config=/etc/grafana-config/grafana.ini
+    expose:
+      - "8080" # metrics
+    image: webdevops/azure-devops-exporter:latest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.traefik-ui.entrypoints=https
+      - traefik.http.routers.traefik-ui.rule=Host(`ingress-grafana.${INGRESS_DOMAIN:?error}`)
+      #- traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIKADMIN}
+      #- traefik.http.routers.traefik-ui.middlewares=traefik-auth
+      - traefik.http.routers.traefik-ui.service=api@internal
+    networks:
+      - internal
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges=true
+#    volumes:
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#      - ./config/traefik/ingress/traefik.yml:/traefik.yml:ro
+#      - ./config/traefik/ingress/configs:/configs:ro
+#      - ./config/traefik/ingress/certs:/etc/certs:ro
+#      - ./config/traefik/ingress/logs:/logs:rw

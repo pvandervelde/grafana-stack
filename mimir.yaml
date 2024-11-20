@@ -1,0 +1,68 @@
+# Settings and configurations that are common for all containers
+x-mimir-common: &mimir-common
+  command: ["-config.file=/etc/mimir.yaml"]
+  expose:
+    - 9009
+  image: grafana/mimir:latest
+  networks:
+      - internal
+  restart: unless-stopped
+
+services:
+  mimir1:
+    <<: *mimir-common
+    depends_on:
+      - minio-proxy
+      - minio-initialize
+    volumes:
+      - ./config/mimir/mimir.yaml:/etc/mimir.yaml
+      - ./config/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+      - mimir1-data:/data
+
+  mimir2:
+    <<: *mimir-common
+    hostname: mimir2
+    depends_on:
+      - minio-proxy
+      - minio-initialize
+    volumes:
+      - ./config/mimir/mimir.yaml:/etc/mimir.yaml
+      - ./config/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+      - mimir2-data:/data
+
+  mimir3:
+    <<: *mimir-common
+    hostname: mimir3
+    depends_on:
+      - minio-proxy
+      - minio-initialize
+    volumes:
+      - ./config/mimir/mimir.yaml:/etc/mimir.yaml
+      - ./config/mimir/alertmanager-fallback-config.yaml:/etc/alertmanager-fallback-config.yaml
+      - mimir3-data:/data
+
+  mimir-proxy:
+    depends_on:
+      - mimir1
+      - mimir2
+      - mimir3
+    expose:
+      - "9009"
+    image: nginx:latest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.mimir.entrypoints=https
+      - traefik.http.routers.mimir.service=mimir
+      - traefik.http.routers.mimir.rule=Host(`prometheus.${INGRESS_DOMAIN:?error}`)
+      - traefik.http.services.mimir.loadbalancer.server.port=9009
+      - traefik.docker.network=internal
+    networks:
+      - internal
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx/mimir.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  mimir1-data:
+  mimir2-data:
+  mimir3-data:

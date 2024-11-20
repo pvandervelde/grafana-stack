@@ -1,0 +1,105 @@
+# Settings and configurations that are common for all containers
+x-minio-common: &minio-common
+  command: server --console-address ":9001" http://minio{1...4}/data{1...2}
+  environment:
+    - MINIO_ROOT_USER=minio_root
+    - MINIO_ROOT_PASSWORD=supersecret
+    - MINIO_PROMETHEUS_AUTH_TYPE=public
+    - MINIO_UPDATE=off
+  dns:
+    - "${LOCAL_NETWORK_DNS_IP:?error}"
+    - "${ROUTER_IP:?error}"
+  dns_opt:
+    - "ndots:1"
+  expose:
+    - 9000
+    - 9001
+  healthcheck:
+    test: ["CMD", "mc", "ready", "local"]
+    interval: 5s
+    timeout: 5s
+    retries: 5
+  image: quay.io/minio/minio:latest
+  networks:
+    - internal
+  restart: unless-stopped
+
+# starts 4 docker containers running minio server instances.
+# using nginx reverse proxy, load balancing, you can access
+# it through port 9000.
+services:
+  minio1:
+    <<: *minio-common
+    hostname: minio1
+    volumes:
+      - minio-data1-1:/data1
+      - minio-data1-2:/data2
+
+  minio2:
+    <<: *minio-common
+    hostname: minio2
+    volumes:
+      - minio-data2-1:/data1
+      - minio-data2-2:/data2
+
+  minio3:
+    <<: *minio-common
+    hostname: minio3
+    volumes:
+      - minio-data3-1:/data1
+      - minio-data3-2:/data2
+
+  minio4:
+    <<: *minio-common
+    hostname: minio4
+    volumes:
+      - minio-data4-1:/data1
+      - minio-data4-2:/data2
+
+  minio-proxy:
+    depends_on:
+      - minio1
+      - minio2
+      - minio3
+      - minio4
+    expose:
+      - "9000"
+      - "9001"
+    image: nginx:latest
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.minio.entrypoints=https
+      - traefik.http.routers.minio.service=minio
+      - traefik.http.routers.minio.rule=Host(`s3-grafana.${INGRESS_DOMAIN:?error}`)
+      - traefik.http.services.minio.loadbalancer.server.port=9001
+
+      - traefik.docker.network=internal
+    networks:
+      - internal
+    restart: unless-stopped
+    volumes:
+      - ./config/nginx/minio.conf:/etc/nginx/nginx.conf:ro
+
+  minio-initialize:
+    image: minio/mc
+    depends_on:
+     - minio-proxy
+    entrypoint: ["/bin/sh", "/init/initialize-minio.sh"]
+    networks:
+      - internal
+    volumes:
+      - ./config/minio/init:/init:ro
+      - ./config/minio/ldap.json:/run/secrets/ldap.json:ro
+      - ./config/minio/policies:/run/secrets/policies:ro
+
+## By default this config uses default local driver,
+## For custom volumes replace with volume driver configuration.
+volumes:
+  minio-data1-1:
+  minio-data1-2:
+  minio-data2-1:
+  minio-data2-2:
+  minio-data3-1:
+  minio-data3-2:
+  minio-data4-1:
+  minio-data4-2:

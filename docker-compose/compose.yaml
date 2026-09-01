@@ -6,7 +6,7 @@
 version: '3.7'
 services:
   grafana:
-    image: grafana/grafana:11.2.0@sha256:408afb9726de5122b00a2576763a8a57a3c86d5b0eff5305bc994ceb3eb96c3f
+    image: grafana/grafana:13.2.1@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
     entrypoint:
       - /usr/share/grafana/bin/grafana-server
       - --homepath=/usr/share/grafana

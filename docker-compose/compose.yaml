@@ -26,7 +26,7 @@ services:
       - "3100:3100"
 
   mimir:
-    image: grafana/mimir:2.13.0@sha256:8bdec4684b1a8011d5f5f7710fcfd89c42139b181978325b65747e47376f40d7
+    image: grafana/mimir:3.2.3@sha256:0ed56db7d7713707eff00224ddd4c3096afa6cf1cbe43a6f9391c537f1416099
     volumes:
       - ./mimir/config:/etc/mimir-config
     entrypoint:
